@@ -1,0 +1,93 @@
+/*
+ *  Author: Shaowei, Liang (n10051813)
+ *  Model Name: InterUSS example protocol
+ *  Status: DEVELOPMENTAL
+ *
+ *  Comments:
+ */
+
+theory InterUSSProtocolAnalysis
+begin
+
+rule makeRequest:
+    [Fr(~p)]
+  	--[Request($C, $N, ~p)  ]->
+    [Out(~p)  ]
+
+rule replyToken:
+  let
+    tkRep =<~token, ~metadata>
+  in
+    [In(p), Fr(~token), Fr(~metadata)  ]
+  --[SndToken($N, $C, tkRep)  ]->
+    [Out(tkRep)  ]
+
+rule putMetadata:
+  let
+      tkRecRep = <token, metadata>
+      metadata = <~op_desc, ~uid, token>
+  in
+    [In(tkRecRep), Fr(~op_desc), Fr(~uid)  ]
+  --[SndMetadata($C, $N, metadata)  ]->
+    [Out(metadata) ]
+
+rule notifySucc:
+  let
+    recMetadata = <op_desc, uid, token>
+    succRep = <~newToken, ~M200>
+  in
+    [In(metadata), Fr(~newToken), Fr(~M200)  ]
+  --[SndSuccMessage($N, $C, succRep)  ]->
+    [Out(succRep)  ]
+
+rule mimAttack_token:
+    [In(p)]
+  --[ManInMiddleToken($D, $N, p) ]->
+    [Out(p)  ]
+
+rule mimAttack_metadata:
+  let
+    recMetadata = <op_desc, uid, token>
+    newMetadata = <~new_op_desc, uid, token>
+  in
+    [In(recMetadata), Fr(~new_op_desc)]
+  --[ManInMiddleMetadata($D, $N, newMetadata)  ]->
+    [Out(newMetadata)  ]
+
+
+lemma excutable_protocol:
+	exists-trace
+	"
+    	Ex C N p tkRep metadata succRep #i #j #k #l.
+    		Request(C, N, p) @i & SndToken(N, C, tkRep) @j & 
+        SndMetadata(C, N, metadata) @k & SndSuccMessage(N, C, succRep) @l &
+
+        i < j &
+        j < k &
+        k < l 
+
+	"
+
+lemma manInMiddleImpossible_for_token:
+	"
+    	All C N p #i.
+    		Request(C, N, p) @i
+    	==>
+    		not (Ex D tkRep #j #k.
+    				  ManInMiddleToken(D, N, p) @j & SndToken(N, D, tkRep) @k & 
+              i < j & j < k
+    			)
+	"
+
+lemma manInMiddleImpossible_for_metadata:
+  "
+      All C N metadata  #i.
+          SndMetadata(C, N, metadata) @i 
+      ==>
+        not (Ex D newMetadata succRep #j #k.
+              ManInMiddleMetadata(D, N, newMetadata) @j & SndSuccMessage(N, C, succRep) @k &
+              i < j & j < k
+          )
+  "
+
+end
